@@ -1,0 +1,69 @@
+name: Build
+
+# Build magpie on push/PR without needing a local toolchain.
+# - CLI: pure-Go cross-compile (no cgo) for every platform, uploaded as artifacts.
+# - macOS app: native build on macos-latest producing a .app bundle.
+# No signing/notarisation (that lives in yetone/magpie-releases); downloaded
+# builds run with a right-click -> Open, like any ad-hoc macOS app.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cli:
+    name: CLI (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: darwin
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+          - goos: windows
+            goarch: arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build CLI (nogui, no cgo)
+        env:
+          CGO_ENABLED: '0'
+        run: make release-cli TARGETS="${{ matrix.goos }}/${{ matrix.goarch }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: magpie-cli-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/magpie-cli-${{ matrix.goos }}-${{ matrix.goarch }}*
+          if-no-files-found: error
+
+  macos-app:
+    name: macOS app (.app)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build macOS .app
+        run: make app
+      - name: Zip .app
+        run: ditto -c -k --keepParent magpie.app magpie-macos-app.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: magpie-macos-app
+          path: magpie-macos-app.zip
+          if-no-files-found: error
