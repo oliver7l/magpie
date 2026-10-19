@@ -1,0 +1,38 @@
+name: Sync upstream
+
+# 每日 + 手动：把 yetone/magpie 的新提交合进本 fork 的 main。
+# 用 GitHub 的 merge-upstream API：
+#   - fork main 没有自己提交（纯镜像）→ 快进，零冲突
+#   - 有自己的提交 → 自动生成合并提交
+#   - 双方改了同一处 → 409 冲突，本 job 失败并留错误标注，需手动解决：
+#       git fetch origin && git merge origin/main  # 解决冲突后
+#       git push oliver7l main
+# 本地手动同步等价命令：gh repo sync oliver7l/magpie -b main
+#
+# 同步产生的 push 会连带触发 Build workflow，自动验证合并结果可编译。
+
+on:
+  schedule:
+    - cron: '23 2 * * *' # 每天 02:23 UTC（北京 10:23），避开整点高峰
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge upstream main into fork main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          if gh api "repos/$GITHUB_REPOSITORY/merge-upstream" -f branch=main > result.json 2> err.txt; then
+            echo "sync OK: $(jq -r '.merge_type // "unknown"' result.json)"
+            echo "head: $(jq -r '.merge_commit_sha // "n/a"' result.json)"
+          else
+            echo "::error::upstream sync failed — likely a merge conflict with your own commits. Resolve manually: git fetch origin && git merge origin/main, fix conflicts, then push to the fork."
+            cat err.txt >&2 || true
+            exit 1
+          fi
