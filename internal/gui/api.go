@@ -1694,7 +1694,7 @@ func Handler(w Windows, gw *gateway.Server) http.Handler {
 			return
 		}
 		v := strings.TrimSpace(in.Model)
-		if v != "" {
+		if v != "" && v != settings.CodexAutoReviewSession {
 			// Resolve intentionally accepts arbitrary names under a known
 			// provider. An approval reviewer must be a model or group magpie
 			// actually lists, including providers kept unlisted for routing.
@@ -2430,8 +2430,9 @@ func state() stateJSON {
 		if a.Import != nil {
 			aj.Import = a.Import()
 			if a.Added != nil {
-				added := a.Added()
-				aj.Added = &added
+				if added, known := a.Added(); known {
+					aj.Added = &added
+				}
 			}
 		}
 		if a.Launch != nil {
