@@ -83,7 +83,7 @@ func modelSpans(s string, o Options) []span {
 			a, b = zhTrim(s, a, b)
 		}
 		if a < b && utf8.ValidString(s[a:b]) && modelTakes(kind, s[a:b]) && modelFits(s, a, b, kind) {
-			out = append(out, span{a, b, kind, ByModel})
+			out = append(out, span{a, b, kind, ByModel, f.Score})
 		}
 	}
 	if o.covers(catPersonal) {
@@ -122,7 +122,8 @@ func modelTakes(kind, v string) bool {
 	case "SECRET":
 		return len(v) >= 8 && !madeID(v) && !namesThing(v)
 	case "PERSON":
-		return utf8.RuneCountInString(v) >= 2 && strings.IndexFunc(v, unicode.IsLetter) >= 0 && !snakeWord(v)
+		// nor a word that starts with a surname, as a whole (文案)
+		return utf8.RuneCountInString(v) >= 2 && strings.IndexFunc(v, unicode.IsLetter) >= 0 && !snakeWord(v) && !zhWords[v]
 	case "ACCOUNT":
 		return !madeID(v)
 	case "EMAIL":
